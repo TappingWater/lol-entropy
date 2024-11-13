@@ -1,6 +1,36 @@
-# Report
+# Feature Selection
 
-mcperera
+## Installation guide
+
+### Using Conda
+
+Install conda or minconda to your system.
+
+Then you can initialize the exact environment I used using the dependencies in my environment.yml file in the root directory:
+
+``` bash
+    conda env create -f environment.yml
+```
+
+This will create a environment named efficientai-mcperera that you can activate or you can switch the name before installing the environment.
+
+### Using pip
+
+You can also use the requirements.txt file to initialize the required libraries
+
+``` bash
+    python -m venv myenv
+    source myenv/bin/activate  
+    pip install -r requirements.txt
+```
+
+## Folder structure
+
+./feature_ranking.ipynb: Contains the analysis for measuring entropy and using information gain to build a decision tree
+./neural_network.ipynb: Contains the analysis of the iris data on a neural network
+./dependencies.py: Required dependencies to run both interactive notebooks
+./imgs: List of all images used for the mark down rendering and report
+./datasets: CSV datasets used as input
 
 ## Ranking features using entropy
 
@@ -343,3 +373,353 @@ Based on this tree we can make the following assumptions:
 - Similarly based on our tree if it is raining and there is also strong wind, it is a negative indicator of playing in the current weather and if the wind is not as strong it is a positive indicator of playing tennis on that day.
 
 Traversing the node based on the split provides info regarding the necessary splits.
+
+## Neural network building and feature contribution analysis
+
+### Iris dataset
+
+For the implementation of the Neural Network, the 'Iris plants dataset' that is available in the python scikit-learn library will be used. It has 4 features with 150 samples, with 50 samples for each class. Therefore, this is a 3 class classification problem.
+
+We can load the dataset easily using a single command. We then split our dataset for training and testing. We will train our network on 80% of this dataset and we will test its corresponding performance on the 20% that we did not use to test the accuracy of our model.
+
+Sci-kit learn has a command that allows us to split our dataset by passing this ratio.
+
+### Data pre-processing
+
+Inspecting our dataset reveals that the we have 4 features with single decimal floating point values. However, they have different scales. For example, we can see from the head of our dataset  that sepal length ranges from 4.6 to 5.1 while petal width is set to 0.2. When each feature has different scaling it can cause the features with higher values to dominate the weights over features that might be more important but have a lower scale. Therefore, we need to perform data pre-processing to ensure our values are standardized.
+
+![iris data](./imgs/iris_data_analysis.png)
+
+To perform standardization we can use different methods:
+
+- StandardScalar: Transformed data has a mean of 0 and a standard deviation of 1
+- MinMaxScaler: Transformed data ranges between [0, 1]
+
+The min max scalar can be more sensitive to outliers as it uses them for the minimum and maximum values. I opted for the standard scalar to transform the dataset.
+
+![standardized ft](./imgs/standardized-features.png)
+
+### One hot encode the target
+
+If we inspect our target variables we see that our labels are codes as 0, 1, 2 where:
+
+- 0: Iris Setosa
+- 1: Iris Versicolor
+- 2: Iris Virginica
+
+We can use one hot encoding which converts our labels to a binary representation to:
+
+- To avoid ordinal relationship which implies 1 > 2
+- Since this is a multi  class classification problem, our output layer should have one neuron for each class which would be 3 neurons in this case.
+- If we want to use the softmax activation function, our loss function will throw an error if there is an incompatible shape between the prediction and target.
+
+### Creating the neural network
+
+A neural network consists of the input layer, the output layer and the hidden layers in between.
+
+In convolution neural networks, a filter is applied across a region and therefore subsequent layers have less neurons.
+
+However, for this problem and to keep things manageable since I will be coding the layers from scratch, I opted to use fully connected hidden layers.
+
+Since we know our output layer will consist of 3 neurons, our last hidden layer needs to map to this neuron.
+
+The first thing we have to do is initialize the parameters for the neural network.
+
+Proper weight initialization is important for several reasons:
+
+- For faster convergence
+- Avoid vanishing / exploding gradients that make training volatile
+- Breaks symmetry by not initializing all weights equally
+
+### He Initialization
+
+He Initialization is a means of initializing the weights of a neural network specially those that use the ReLU activation function.
+
+``` python
+parameters[f'W{i}'] = np.random.randn(layer_sizes[i-1], layer_sizes[i]) * np.sqrt(2 / layer_sizes[i-1])
+```
+
+He Initialization uses the size of the previous layer to scale the initial weights to improve convergence.
+
+Now we have a function that can initialize the parameters based on the number of hidden layers we want. For example if we wanted two hidden layers with 10 and 20 neurons we can do the following to initialize our parameters:
+
+``` python
+input_size = ft_train.shape[1]
+output_size = label_train.shape[1]
+
+layer_sizes = [input_size, 10, 20, output_size]
+iris_10_20_parameters = dependencies.initialize_parameters(layer_sizes)
+```
+
+![Initialized weights](./imgs/initialized%20weights.png)
+
+### Forward Propagation
+
+Process of data passing through the neurons in subsequent layers. Since we have multiple layers we need a method to do our computations till we reach the output layer.
+
+``` python
+def forward_propagation(input_data, parameters):
+    """
+    Propagate input data forward through the network.
+
+    Parameters:
+    - input_data: The input features.
+    - parameters: Dictionary containing the network parameters.
+
+    Returns:
+    - activation: The output of the last layer (predictions).
+    - forward_propagation_cache: List of caches containing intermediate computations.
+    """
+    forward_propagation_cache = []
+    activation = input_data
+    num_layers = len(parameters) // 2  
+    for layer_index in range(1, num_layers + 1):
+        activation_prev = activation
+        weights = parameters[f'W{layer_index}']
+        biases = parameters[f'b{layer_index}']
+        linear_output = np.dot(activation_prev, weights) + biases
+        if layer_index == num_layers:
+            activation = softmax(linear_output)
+        else:
+            activation = relu(linear_output)
+        forward_propagation_cache.append((activation_prev, weights, biases, linear_output))
+    return activation, forward_propagation_cache
+```
+
+During this step we generate an output based on the current weight and biases.
+
+Training continues until we reach a certain number of epochs or there are no updates to the weights or biases during an epoch.
+
+For simplicity I decided to use reLU as the activation function for the hidden layers and softmax as the activation function for the output layer.
+
+ReLU helps to add non linearity to the problem. Once we reach the output layer our cache contains the information required for backward propagation.
+
+### Backward propagation
+
+Process of computing the gradient of the loss function with respect to the weight and bias based on the chain rule.
+
+``` python
+def backward_propagation(activation_layer, expected_labels, forward_propagation_cache):
+    """
+    Implements backward propagation for the neural network.
+
+    Parameters:
+    - activation_layer: Output from forward propagation (predictions).
+    - expected_labels: True labels (one-hot encoded).
+    - forward_propagation_cache: List of caches from forward propagation.
+
+    Returns:
+    - grads: Dictionary with gradients for each parameter.
+    """
+    grads = {}
+    num_layers = len(forward_propagation_cache)
+    m = expected_labels.shape[0]
+    expected_labels = expected_labels.reshape(activation_layer.shape)
+    delta_linear_output = activation_layer - expected_labels 
+    for layer_index in reversed(range(num_layers)):
+        activation_prev, weights, biases, linear_output = forward_propagation_cache[layer_index]
+        # Compute gradients for the current layer
+        delta_weights = np.dot(activation_prev.T, delta_linear_output) / m
+        delta_biases = np.sum(delta_linear_output, axis=0, keepdims=True) / m
+        # Store gradients
+        grads[f'dW{layer_index + 1}'] = delta_weights
+        grads[f'db{layer_index + 1}'] = delta_biases
+        if layer_index > 0:
+            # Compute delta_linear_output for the previous layer
+            delta_activation_prev = np.dot(delta_linear_output, weights.T)
+            linear_output_prev = forward_propagation_cache[layer_index - 1][3]
+            delta_linear_output = delta_activation_prev * relu_derivative(linear_output_prev)
+    return grads
+```
+
+We start at the output layer and move back backwards.  We adjust our weights and biases based on the performance.
+
+The loss function is used to compute the difference between predicted and final labels. Since this is a multi-class classification problem since we have 3 possible classes we can use cross entropy. We then update our parameter during backward propagation.
+
+We use this to then update our parameters during backward propagation based on our learning rate.
+
+### Training
+
+Now that we have implemented both forward and backward propagation we can effectively complete an epoch. An epoch is one pass over all the training samples. Training is basically completing a limited number of epochs or achieving convergence whichever occurs first.
+
+``` python
+def train(training_data, expected_labels, layer_sizes, epochs, learning_rate):
+    """
+    Trains the neural network.
+
+    Parameters:
+        training_data: Input features for training.
+        expected_labels: True labels (one-hot encoded).
+        layer_sizes: List containing the size of each layer.
+        epochs: Number of epochs to train.
+        learning_rate: Learning rate for gradient descent.
+
+    Returns:
+        parameters: Trained parameters.
+        loss_history: List of loss values during training.
+    """
+    parameters = initialize_parameters(layer_sizes)
+    loss_history = []
+    for epoch in range(epochs):
+        # Forward propagation
+        activation_layer, forward_propagation_cache = forward_propagation(training_data, parameters)
+        # Compute loss
+        loss = compute_loss(expected_labels, activation_layer)
+        loss_history.append(loss)
+        # Backward propagation
+        grads = backward_propagation(activation_layer, expected_labels, forward_propagation_cache)
+        # Update parameters
+        parameters = update_parameters(parameters, grads, learning_rate)
+    return parameters, loss_history
+```
+
+### Training loss
+
+We can now use the loss_history variable to plot our loss over multiple epochs using pyplot as follow
+
+![training loss](./imgs/training-loss.png)
+
+We can see that as we increase the number of epochs and we improve our weights little by little our training loss is also reduced.
+
+At epoch 100 we have a loss 0.8036 and once we finalize and reach a 1000 epochs we end up with a much smaller 0.2240.
+
+This means our training is working as intended.
+
+### Testing model
+
+To evaluate our model we use the test data set that we have been saving till now which was 20% of the original set.
+
+We simply use our predict function based on the final parameters and then compute the difference with the expected label.
+
+We end up with a model accuracy of 96.67%
+
+![model accuracy](./imgs/model_accuracy.png)
+
+### Backward search feature selection
+
+The high level steps needed to implement backward search is as follow:
+
+- Train the model with all features.
+- Evaluate the importance of each feature
+- Remove the least important feature
+- Retrain model with new set of features
+- We keep doing this till we reach the desired number of features or there is no improvement in performance
+
+### Determining feature importance
+
+We can use the wrights of the first layer to get the mean weight for each feature.
+
+The lowest mean means that feature has low weights compared to its peers and thus not as important.
+
+I chose this as the criteria for which features to drop.
+
+It is important to note that each time we drop a feature we need to retrain as we lose a neuron in our input layer and our previous parameters will no longer line up.
+
+Also the dataset will  be different as there will be one less column
+
+``` python
+def backward_feature_elimination(input_data, expected_labels, feature_names, layer_sizes, epochs, learning_rate, min_features=1):
+    """
+    Performs backward feature elimination on the dataset.
+
+    Parameters:
+    - input_data: Input data as a NumPy array.
+    - expected_labels: True Labels (one-hot encoded).
+    -feature_names: List of feature names.
+    - layer_sizes: List containing the size of each layer.
+    - epochs: Number of epochs to train.
+    - learning_rate: Learning rate for gradient descent.
+    - min_features: Minimum number of features to retain.
+
+    Returns:
+    - selected_features: List of selected features after elimination.
+    - performance_history: List of tuples (number of features, accuracy).
+    """
+    performance_history = []
+    current_dataset = input_data.copy()
+    feature_names_current = feature_names.copy()
+    while len(feature_names_current) > min_features:
+        # Update layer sizes to match the current number of features
+        current_layer_sizes = layer_sizes.copy()
+        current_layer_sizes[0] = current_dataset.shape[1]
+        # If we remove a feature we need to retrain it again with the new input layer which will have less neurons
+        parameters, _ = train(current_dataset, expected_labels, current_layer_sizes, epochs, learning_rate)
+        # Evaluate the model
+        predictions = predict(current_dataset, parameters)
+        true_labels = np.argmax(expected_labels, axis=1)
+        accuracy = np.mean(predictions == true_labels)
+        performance_history.append((len(feature_names_current), accuracy))
+        # Compute feature importance
+        feature_importance = compute_feature_importance(parameters)
+        # Identify and drop the least important feature
+        least_important_feature = get_least_important_feature(feature_importance, feature_names_current)
+        print(f"Dropping feature: {least_important_feature} with accuracy: {accuracy:.4f}")
+        # Drop the feature from the dataset
+        current_dataset, feature_names_current = drop_feature(current_dataset, feature_names_current, least_important_feature)
+    return feature_names_current, performance_history
+```
+
+When we drop features one by one and test the performance we end up with:
+
+``` bash
+Epoch 100/1000, Loss: 0.8036
+Epoch 200/1000, Loss: 0.6855
+Epoch 300/1000, Loss: 0.5526
+Epoch 400/1000, Loss: 0.4336
+Epoch 500/1000, Loss: 0.3642
+Epoch 600/1000, Loss: 0.3210
+Epoch 700/1000, Loss: 0.2885
+Epoch 800/1000, Loss: 0.2637
+Epoch 900/1000, Loss: 0.2425
+Epoch 1000/1000, Loss: 0.2240
+Dropping feature: sepal length (cm) with accuracy: 0.9417
+Epoch 100/1000, Loss: 1.0912
+Epoch 200/1000, Loss: 1.0099
+Epoch 300/1000, Loss: 0.9440
+Epoch 400/1000, Loss: 0.8900
+Epoch 500/1000, Loss: 0.8401
+Epoch 600/1000, Loss: 0.7751
+Epoch 700/1000, Loss: 0.6873
+Epoch 800/1000, Loss: 0.5777
+Epoch 900/1000, Loss: 0.4852
+Epoch 1000/1000, Loss: 0.4051
+Dropping feature: petal width (cm) with accuracy: 0.9500
+Epoch 100/1000, Loss: 0.8576
+Epoch 200/1000, Loss: 0.6841
+Epoch 300/1000, Loss: 0.5832
+Epoch 400/1000, Loss: 0.5062
+Epoch 500/1000, Loss: 0.4496
+Epoch 600/1000, Loss: 0.4068
+Epoch 700/1000, Loss: 0.3730
+Epoch 800/1000, Loss: 0.3441
+Epoch 900/1000, Loss: 0.3178
+Epoch 1000/1000, Loss: 0.2956
+Dropping feature: sepal width (cm) with accuracy: 0.9083
+Epoch 100/1000, Loss: 0.6801
+Epoch 200/1000, Loss: 0.5005
+Epoch 300/1000, Loss: 0.4056
+Epoch 400/1000, Loss: 0.3404
+Epoch 500/1000, Loss: 0.2939
+Epoch 600/1000, Loss: 0.2600
+Epoch 700/1000, Loss: 0.2343
+Epoch 800/1000, Loss: 0.2145
+Epoch 900/1000, Loss: 0.1990
+Epoch 1000/1000, Loss: 0.1867
+Dropping feature: petal length (cm) with accuracy: 0.9500
+Selected features after backward feature elimination: []
+```
+
+This is a bit strange as our model accuracy increases as we reduce the number of features as can be seen by this plot and needs further validation as we test the performance on the current dataset and there is a risk of overfitting. However, it also means we can reduce certain features without impacting the accuracy too much:
+
+![backward elimination](./imgs/backward-feature-elimination.png)
+
+### Analysis
+
+Based on the dataset and how we processed it these values can be entirely different. However, these results also show us that we can further improve the performance of our model by dropping unneeded features.
+
+Based on our model we can determine the feature importance as:
+
+- Sepal length
+- Petal width
+- Sepal width
+- Petal length
