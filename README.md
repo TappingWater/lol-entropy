@@ -2,6 +2,14 @@
 
 ## Installation guide
 
+### Github
+
+The code for this is available on github at:
+
+``` bash
+git clone https://github.com/TappingWater/lol-entropy.git
+```
+
 ### Using Conda
 
 Install conda or minconda to your system.
