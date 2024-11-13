@@ -331,7 +331,7 @@ Our rendered tree will contain the following visual information:
 - Edges:
   - Value used to determine the split
 
-![Decision tree weather](./imgs/decision-tree.png)
+![Decision tree weather](./imgs/decision_tree.png)
 
 ### Observations
 
@@ -342,4 +342,4 @@ Based on this tree we can make the following assumptions:
 - If the outlook is overcast the decision tree indicates that it is a strong indicator of playing in that weather.
 - Similarly based on our tree if it is raining and there is also strong wind, it is a negative indicator of playing in the current weather and if the wind is not as strong it is a positive indicator of playing tennis on that day.
 
-Traversing the node based on the split provides info regarding the necessary splits
+Traversing the node based on the split provides info regarding the necessary splits.
