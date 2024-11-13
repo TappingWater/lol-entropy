@@ -331,15 +331,15 @@ Our rendered tree will contain the following visual information:
 - Edges:
   - Value used to determine the split
 
-![Decision tree weather](./imgs/weather-tree.png)
+![Decision tree weather](./imgs/decision-tree.png)
 
 ### Observations
 
-The tree's nodes are split and add are pure leaf nodes belonging to a single target class.
+The tree's nodes are split till we end up with pure leaf nodes belonging to a single target class.
 
-If the outlook is overcast the decision tree indicates that it is a strong indicator of playing in that weather.
+Based on this tree we can make the following assumptions:
 
-Similarly based on our tree if it is raining and there is also strong wind, it is a negative indicator of playing in the current weather and if the wind is not as strong it is a positive indicator of playing tennis on that day.
+- If the outlook is overcast the decision tree indicates that it is a strong indicator of playing in that weather.
+- Similarly based on our tree if it is raining and there is also strong wind, it is a negative indicator of playing in the current weather and if the wind is not as strong it is a positive indicator of playing tennis on that day.
 
-Similarly we can traverse our tree to make decisions based on the provided dataset.
-
+Traversing the node based on the split provides info regarding the necessary splits
