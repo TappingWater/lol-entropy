@@ -2,14 +2,6 @@
 
 ## Installation guide
 
-### Github
-
-The code for this is available on github at:
-
-``` bash
-git clone https://github.com/TappingWater/lol-entropy.git
-```
-
 ### Using Conda
 
 Install conda or minconda to your system.
@@ -34,11 +26,11 @@ You can also use the requirements.txt file to initialize the required libraries
 
 ## Folder structure
 
-./feature_ranking.ipynb: Contains the analysis for measuring entropy and using information gain to build a decision tree
-./neural_network.ipynb: Contains the analysis of the iris data on a neural network
-./dependencies.py: Required dependencies to run both interactive notebooks
-./imgs: List of all images used for the mark down rendering and report
-./datasets: CSV datasets used as input
+- ./feature_ranking.ipynb: Contains the analysis for measuring entropy and using information gain to build a decision tree
+- ./neural_network.ipynb: Contains the analysis of the iris data on a neural network
+- ./dependencies.py: Required dependencies to run both interactive notebooks
+- ./imgs: List of all images used for the mark down rendering and report
+- ./datasets: CSV datasets used as input
 
 ## Ranking features using entropy
 
